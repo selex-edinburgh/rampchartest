@@ -47,8 +47,8 @@ pygame.display.set_caption("Motor Test")	        # Window Title
 def setSerial():
     try:
         ser= serial.Serial(         #Set up Serial Interface
-#	    port = '/dev/ttyS0',    #If a Raspberry Pi 3B (UART using Tx pin8, Rx pin10)
-            port = '/dev/ttyAMA0',  #If a Raspberry Pi 2B (UART using Tx pin8, Rx pin10)
+	    port = '/dev/ttyS0',    #If a Raspberry Pi 3B (UART using Tx pin8, Rx pin10)
+#            port = '/dev/ttyAMA0',  #If a Raspberry Pi 2B (UART using Tx pin8, Rx pin10)
             baudrate = 38400,       #bits/sec
             bytesize=8, parity='N', stopbits=1, #8-N-1  protocal 
             timeout=1               #1 sec
