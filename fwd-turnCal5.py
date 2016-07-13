@@ -214,7 +214,9 @@ def main():
                 if event.key == pygame.K_END:   #STOP  (End Key)
                     fwd  = 127                  #no forward movement   
                     turn = 127                  #no turn movement
-                    
+                if event.key == pygame.K_RIGHT: #increase right turn
+                    fwd = 127
+                    turn = 127
         # limit values & write the fwd and turn to the motors via serial link
         if (fwd < 254) and (fwd > 1):   #valid range to fit in an 8bit byte
             ser.write(chr(fwd))         #send fwd command to motor board
