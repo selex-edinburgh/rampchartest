@@ -47,8 +47,8 @@ GPIO.setup(23, GPIO.OUT)    #Clock pin common to both odometers
 def setSerial():
     try:
         ser= serial.Serial(         #Set up Serial Interface
-#            port = '/dev/ttyS0',        #If a Raspberry Pi 3B 
-            port = '/dev/ttyAMA0',  #If a Raspberry Pi 2B 
+            port = '/dev/ttyS0',        #If a Raspberry Pi 3B 
+#            port = '/dev/ttyAMA0',  #If a Raspberry Pi 2B 
             baudrate = 38400,       #bits/sec
             bytesize=8, parity='N', stopbits=1,     #8-N-1  protocal 
             timeout=1                               #1 sec
