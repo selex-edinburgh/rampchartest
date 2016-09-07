@@ -158,7 +158,7 @@ def main():
 
     font = pygame.font.SysFont('Avenir Next', 20)   # preset font to use
 
-#    constants = init_pins()     # initialise and setup the pins to use
+    constants = init_pins()     # initialise and setup the pins to use
 
 
     while True:		        # infinite loop with a catch variable
