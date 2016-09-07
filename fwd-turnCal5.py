@@ -9,6 +9,7 @@ import time
 import serial
 import sys
 import pygame
+import math
 
 # Initialise display parameters of Pygame display window
 pygame.init()       
@@ -77,7 +78,7 @@ def getTelemetry(ser):  #Not currently used in this program
 def read_Odometers():
     
     # initialise local variables
-    tick = 0.000005     #Half Odom Serial clock period 5us=100K bits/s(Max 1MHz)
+    TICK = 0.000005     #Half Odom Serial clock period 5us=100K bits/s(Max 1MHz)
     i = 15              #bit count index number
     readBitLt = 0       #Lt Odom Data bit
     readBitRt = 0       #Rt Odom Data bit
@@ -89,11 +90,11 @@ def read_Odometers():
     # Read the Odometers
     # Bring the chip select pin high and then low before reading data.
     GPIO.output(24, True)   #Chip Select pin High (normal state)
-    time.sleep(tick)        #Half odom Serial clock period
+    time.sleep(TICK)        #Half odom Serial clock period
     GPIO.output(23, True)   #Clock pin High (normal state)
-    time.sleep(tick)
+    time.sleep(TICK)
     GPIO.output(24, False)  #Chip Select pin Low (both odom triggered to output data)
-    time.sleep(tick)        #Wait min of 500ns
+    time.sleep(TICK)        #Wait min of 500ns
     
     # bit data changes on each rising edge of clock 
     while i >= 0:   # loop 16 times to read 16 bits of data from the odometers
@@ -101,9 +102,9 @@ def read_Odometers():
                     # the least significant bit (lsb) is last (bit 0)   
         # pulse the clock Low and High and read data pins high and low
         GPIO.output(23, False)  #Clock pin Low
-        time.sleep(tick)
+        time.sleep(TICK)
         GPIO.output(23, True)   #Clock pin High 
-        time.sleep(tick)        #Wait half clock period and read bit data
+        time.sleep(TICK)        #Wait half clock period and read bit data
         
         readBitLt = GPIO.input(18)    #read a bit from Lt odometer Data pin
         readBitRt = GPIO.input(22)    #read a bit from Rt odometer Data pin
@@ -120,7 +121,7 @@ def read_Odometers():
 
         i -= 1      #decrement bit count index number
 
-    time.sleep(tick)        #Complete clock cycle
+    time.sleep(TICK)        #Complete clock cycle
     GPIO.output(24, True)   #Chip Select pin High (normal state)
     return (angDataLt, angDataRt, statusLt, statusRt)
 
@@ -184,16 +185,19 @@ def main():
     turn = 127		#motor command no Turn Rate
     odomDistLt = 0      #start condition for distance travelled by left wheel
     odomDistRt = 0      #start condition for distance travelled by right wheel
-    prevAngDataLt= 0  #start condition for Lt odom angle data on previous read
-    prevAngDataRt= 0  #start condition for Rt odom angle data on previous read
+    prevAngDataLt= 0    #start condition for Lt odom angle data on previous read
+    prevAngDataRt= 0    #start condition for Rt odom angle data on previous read
+    WHEELCIRCUMFERENCE = 500    # value in mm
+    TRACKWIDTH = 250            # value in mm
 
     # Read odometers once to get wheel angle offsets at robot start position
     (angDataLt,angDataRt, statusLt,statusRt) = read_Odometers() #function call
                                                 #to obtain raw data and status
-    odomAngOffsetLt = angDataLt    #store left wheel offset
-    odomAngOffsetRt = angDataRt    #store right wheel offset
-#    prevAngDataLt = angDataLt   #start condition for prevAngDataLt
-#    prevAngDataRt = angDataRt   #start condition for prevAngDataRt 
+   # odomAngOffsetLt = angDataLt    #store left wheel offset
+   # odomAngOffsetRt = angDataRt    #store right wheel offset
+    prevAngDataLt = angDataLt   #start condition for prevAngDataLt
+    prevAngDataRt = angDataRt   #start condition for prevAngDataRt 
+
 
     # Commands to be actioned endlessly in a loop until program stopped    
     while loop1 == True:    #loops until loop1 is declared False
@@ -247,10 +251,14 @@ def main():
         correctedOdomDistLt1 = odomDistLt 
         correctedOdomDistRt1 = -odomDistRt
         # correct for both odometers initial position at start
-        correctedOdomDistLt2 = correctedOdomDistLt1 - odomAngOffsetLt
-        correctedOdomDistRt2 = correctedOdomDistRt1 + odomAngOffsetRt
+#        correctedOdomDistLt2 = correctedOdomDistLt1 - odomAngOffsetLt
+#        correctedOdomDistRt2 = correctedOdomDistRt1 + odomAngOffsetRt
         # correct for wheel diameters to get both readings in mm from start
         #code TBD
+        #Heading as decimal type
+        heading = (360*(((correctedOdomDistLt1-correctedOdomDistRt1)/2)*\
+                       ((WHEELCIRCUMFERENCE)/(1024*math.pi*TRACKWIDTH))))%360
+        headingrounded = round(heading, 1) # rounded for ease of use
 
         
         
@@ -272,9 +280,9 @@ def main():
         #test displays to ensue correct odom readings
         screen.blit(font.render(str(correctedOdomDistLt1),True,white),(45,80))
         screen.blit(font.render(str(correctedOdomDistRt1),True,white),(123,80))
-        screen.blit(font.render(str(correctedOdomDistLt2),True,white),(45,90))
-        screen.blit(font.render(str(correctedOdomDistRt2),True,white),(123,90))
-        
+ #       screen.blit(font.render(str(correctedOdomDistLt2),True,white),(45,90))
+ #       screen.blit(font.render(str(correctedOdomDistRt2),True,white),(123,90))
+        screen.blit(font.render(str(headingrounded),True,white),(190,60))
         #Display telemetry values
 #        screen.blit(font.render(str(telemetry[0]),True,white),(50,25))
 #        screen.blit(font.render(str(telemetry[1]),True,white),(100,25))
