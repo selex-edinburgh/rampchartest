@@ -137,17 +137,17 @@ def read_Odometers():
     This function is called from main().
 '''
 def handle_rollovers(angDataLt,angDataRt,prevAngDataLt,prevAngDataRt,\
-    prevOdomDistLt,odomDistRt):
+    odomDistLt,odomDistRt):
     # Calculate change in odometer angles
     changeLt = angDataLt - prevAngDataLt  #change in dataLt since last reading
     changeRt = angDataRt - prevAngDataRt  #change in dataRt since last reading
 
     if (angDataLt <341) and (prevAngDataLt >683):  #positive rollover sector
-        odomDistLt = prevOdomDistLt + 1024 + changeLt
+        odomDistLt = odomDistLt + 1024 + changeLt
     elif (angDataLt >683) and (prevAngDataLt <341):#negative rollover sector
-        odomDistLt = prevOdomDistLt - 1024 + changeLt
+        odomDistLt = odomDistLt - 1024 + changeLt
     else:
-        odomDistLt = prevOdomDistLt + changeLt         #no rollover 
+        odomDistLt = odomDistLt + changeLt         #no rollover 
 
     if (angDataRt <341) and (prevAngDataRt >683):  #positive rollover
         odomDistRt = odomDistRt + 1024 + changeRt
@@ -193,8 +193,8 @@ def main():
     # Read odometers once to get wheel angle offsets at robot start position
     (angDataLt,angDataRt, statusLt,statusRt) = read_Odometers() #function call
                                                 #to obtain raw data and status
-   # odomAngOffsetLt = angDataLt    #store left wheel offset
-   # odomAngOffsetRt = angDataRt    #store right wheel offset
+    #odomAngOffsetLt = angDataLt    #store left wheel offset
+    #odomAngOffsetRt = angDataRt    #store right wheel offset
     prevAngDataLt = angDataLt   #start condition for prevAngDataLt
     prevAngDataRt = angDataRt   #start condition for prevAngDataRt 
 
