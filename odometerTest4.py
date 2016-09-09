@@ -1,27 +1,34 @@
-#desktop/testPrograms/odometerTest3.py   2/9/16
-#This program tests the odometers on each wheel independently by hand movement
-#Rollover and Continuous Modes are selected by keyboard c
-
-#!/usr/bin/env python
+# desktop/testPrograms/odometerTest4.py   12/9/16
+# This program tests the odometers on each wheel independently
+#  by hand movement
+# Rollover and Continuous Modes are selected by keyboard c
+# End = Exit program        BUG
 
 # import libraries
-import time
-import serial
-import sys
-import pygame
+import sys              # import standard python module
+import serial           # import standard python module
+import time             # import standard python module
+import math             # import standard python module
+import pygame           # import pygame
 
 # Initialise display parameters of Pygame display window
 pygame.init()       
 black = (0,0,0)         # Preset colours to use
 white = (255,255,255)
 red = (255,0,0)
-displayWidth = 230      # Size of Window
-displayHeight = 105
+displayWidth = 370      # Size of Window
+displayHeight = 100      #
 screen = pygame.display.set_mode((displayWidth,displayHeight))  
 screen.fill(black)      # set the screen background to black
-font = pygame.font.SysFont('Avenir Next', 20)   # Preset font to use
-pygame.display.set_caption("Odo Test")     # Window Title
+font = pygame.font.SysFont('Avenir Next', 18) # Preset font & size
+pygame.display.set_caption("Odom Test")       # Window Title
 
+
+'''
+    The Odometers use a simple synchronised two way data link.
+    The GPIO pins are used for this serial link and must be designated and
+    the direction of data flow defined.
+'''
 # Set up GPIO pins
 try:    # try and import the GPIO library and catch a RunTimeError on fail
     import RPi.GPIO as GPIO
@@ -30,8 +37,8 @@ except RunTimeError as err: # catch the RunTimeError and output a response
     print ("Error: Can't import RPi.GPIO")
 
 #Initialise GPIO
-GPIO.setwarnings(False)
-GPIO.cleanup()
+GPIO.setwarnings(False)     #Inhibits display of unwanted GPIO warnings  
+GPIO.cleanup()              #Clears any previous GPIO pin designations
 GPIO.setmode(GPIO.BCM)      #GPIO number designation (not pin nos)
 GPIO.setup(18, GPIO.IN)     #Data pin Left Odometer
 GPIO.setup(22, GPIO.IN)     #Data pin Right Odometer
@@ -39,8 +46,20 @@ GPIO.setup(24, GPIO.OUT)    #Chip Select pin common to both odometers
 GPIO.setup(23, GPIO.OUT)    #Clock pin common to both odometers
 
 '''
-   The read_odometers function will read angular and status data from the
+   The read_odometers function will read angle and status data from the
    odometers directly and pass the result back to the main(). 
+
+   The Odometers use a simple synchronised two way data link.
+   The GPIO Chip Select pins on both odometers are connected together
+   so that both odometers are triggered to start simultaneously.
+   The GPIO Clock pins on both odometers are also connected together
+   so that the 16 data bits are clocked out simultaneously.
+   The Odometer Data output pins are connected to separate GPIO pins
+   and the bit values are read separately.
+   We assemble these individual bits of data into separate 16 bit words.
+   Each 360 degree rotation of the wheel is divided up into 1024 steps.
+   During every rotation the data counts from 0 to 1024 and then starts again.
+   The step change between 0 and 1024 and visa versa is called a rollover
 '''
 def read_Odometers():
     
@@ -71,8 +90,7 @@ def read_Odometers():
         GPIO.output(23, False)  #Clock pin Low
         time.sleep(TICK)
         GPIO.output(23, True)   #Clock pin High 
-        time.sleep(TICK)        #Wait half clock period and read bit data
-        
+        time.sleep(TICK)        #Wait half clock period and read bit data        
         readBitLt = GPIO.input(18)    #read a bit from Lt odometer Data pin
         readBitRt = GPIO.input(22)    #read a bit from Rt odometer Data pin
 
@@ -129,29 +147,23 @@ def handle_rollovers(angDataLt,angDataRt,prevAngDataLt,prevAngDataRt,\
     return(odomDistLt,odomDistRt,prevAngDataLt,prevAngDataRt)
 
 '''
-    The main function is the main function of the program.
-    It creates a Dictionary of constants that can be used
-    in other functions.
-    The function will setup the GPIO pins and then run
-    an infinite loop that will read from the odometers,
-    slice the reading into a readable chunk,
-    and then handle any rollovers that might occur
-    before outputting the result.
+    This is the main function of the program. 
+    First it calls the readOdometers function once to obtain the raw odometer
+    angle information for the start position (zero distance). 
+    
+    It then starts a continuous loop, within which commands are actioned
+    endlessly until the program is stopped.
+    The odometer code section sets up the GPIO pins and within an infinite
+    loop, reads from the odometers and handles any rollovers before
+    outputting the result.
 '''
 def main():
     # Commands to be actioned once on start of program
-    # initialise local variables
+    # initialise data links and local variables 
+    pygame.init()       #call Function to Initialise Pygame
+    loop1 = True        #boolean variable to allow exit from main loop
     mode = "Continuous"
     loop1 = True        #boolean variable to allow exit from main loop
-    '''
-    values = [0,0]
-    readings = [0,0]
-    prevReadings = [0,0]
-    prevRollovers = [0,0]
-    init_readings = [0,0]
-    is_first = 0
-    '''
-    pygame.init()       # initialise pygame
     odomDistLt = 0      #start condition for distance travelled by left wheel
     odomDistRt = 0      #start condition for distance travelled by right wheel
     prevAngDataLt= 0    #start condition for Lt odom angle data on previous read
@@ -160,10 +172,13 @@ def main():
     # Read odometers once to get wheel angle offsets at robot start position
     (angDataLt,angDataRt, statusLt,statusRt) = read_Odometers() #function call
                                                 #to obtain raw data and status
+    startAngLt = angDataLt    #start condition for angDataLt
+    startAngRt = angDataRt    #start condition for angDataRt
     prevAngDataLt = angDataLt   #start condition for prevAngDataLt
-    prevAngDataRt = angDataRt   #start condition for prevAngDataRt 
-    
-    # Commands to be actioned endlessly in a loop until program stopped    
+    prevAngDataRt = angDataRt   #start condition for prevAngDataRt
+    '''
+    Commands to be actioned endlessly in a loop until program stopped    
+    '''
     while loop1 == True:    #loops until loop1 is declared False
 
         
@@ -172,44 +187,57 @@ def main():
                 pygame.quit()
                 sys.exit()
             if event.type == pygame.KEYDOWN:    # look for key presses
-                # safe quit on "q" press or "ESC" press
-                if event.key == pygame.K_q or event.key == pygame.K_ESCAPE:		
+                # safe quit on "END" press or "ESC" press
+                if event.key == pygame.K_END or event.key == pygame.K_ESCAPE:		
                     pygame.quit()
                     sys.exit()
-                '''
-                elif event.key == pygame.K_c:
-                    if mode == "Rollover":
-                        mode = "Continuous"
-                    elif mode == "Continuous":
-                        mode = "Rollover"
-                '''
 
         # read odometers for raw angle data and status
         (angDataLt,angDataRt,statusLt,statusRt) = read_Odometers()
+
+        # correct for odometer start position for display
+        correctedStartAngLt = angDataLt - startAngLt
+        correctedStartAngRt = angDataRt - startAngRt
+        if correctedStartAngLt < 0:
+            correctedStartAngLt = correctedStartAngLt + 1024
+        if correctedStartAngRt < 0:
+            correctedStartAngRt = correctedStartAngRt + 1024
 
         # calculate odometer distances by actioning rollovers
         (odomDistLt,odomDistRt,prevAngDataLt,prevAngDataRt)= handle_rollovers\
             (angDataLt,angDataRt,prevAngDataLt,prevAngDataRt,\
              odomDistLt,odomDistRt)
         # correct for right odometer and motor operating in reverse
-        correctedOdomDistLt1 = odomDistLt 
-        correctedOdomDistRt1 = -odomDistRt
+        odomDistRtReversed = -odomDistRt    #value for display
         
-        '''
-        data = read_raw(constants)		# read from odometers
 
-        readings[0] = bit_slicer(data,constants['READING_LOW_0_BIT'],constants['READING_BIT_LENGTH'])
-        readings[1] = bit_slicer(data,constants['READING_LOW_1_BIT'],constants['READING_BIT_LENGTH'])
-		
-        if mode == "Continuous":
-            values = handle_rollovers(readings,constants, prevReadings, prevRollovers)	# handle rollovers
-        elif mode == "Rollover":
-            values = readings
-        '''			
         # Pygame Display Code
         # update the pygame data display
         screen.fill(black)  #Blank out previous digits in display window
 
+
+        # Display odometer output text and values to the screen
+        screen.blit(font.render("Left Odom   Right Odom ",\
+            True,white),(100,10))
+        screen.blit(font.render("Rollover",True,white),(15,25))
+        screen.blit(font.render("Raw Data",True,white),(235,25))
+        screen.blit(font.render("Corrected Start Posn",True,white),(235,40))
+        screen.blit(font.render("Corrected Start Posn",True,white),(235,60))
+        screen.blit(font.render("Continuous",True,white),(15,60))
+        screen.blit(font.render("Rt Odom Reversed",True,white),(235,75))
+
+        # Display odometer test values to test for correct odom readings
+        screen.blit(font.render(str(angDataLt),True,white),(123,25))
+        screen.blit(font.render(str(angDataRt),True,white),(193,25))
+        screen.blit(font.render(str(correctedStartAngLt),True,white),(123,40))
+        screen.blit(font.render(str(correctedStartAngRt),True,white),(193,40))
+        screen.blit(font.render(str(odomDistLt),True,white),(123,60))
+        screen.blit(font.render(str(odomDistRt),True,white),(193,60))
+        screen.blit(font.render(str(odomDistLt),True,white),(123,75))
+        screen.blit(font.render(str(odomDistRtReversed),True,white),(193,75))
+
+
+        '''
         # display odometer output text and values to the screen
         screen.blit(font.render("Odometers: ",True,white),(15,5))
         screen.blit(font.render("(left,   right)",True,white),(135,5))
@@ -222,8 +250,9 @@ def main():
         # test displays to ensue correct odom readings / might want to leave out\
             # the corrected right wheel value to be shown in combo program
         screen.blit(font.render("RC  Continuous",True,white),(15,65))
-        screen.blit(font.render(str(correctedOdomDistLt1),True,white),(140,65))
-        screen.blit(font.render(str(correctedOdomDistRt1),True,white),(175,65))
+#        screen.blit(font.render(str(correctedOdomDistLt1),True,white),(140,65))
+#        screen.blit(font.render(str(correctedOdomDistRt1),True,white),(175,65))
+        '''
         '''              
         screen.blit(font.render(str(int(values[0])),True,white),(95,25))
         screen.blit(font.render(str(int(constants['ROLLOVER_RANGE']-values[1])),True,white),(125,25))
@@ -234,6 +263,7 @@ def main():
 
 # program start
 main()
-pygame.quit()
-sys.exit
-quit()
+
+# Program exit when END key pressed.
+pygame.quit()       # uninstall all pygame modules
+sys.exit()          # exit from Python
