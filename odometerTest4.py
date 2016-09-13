@@ -122,24 +122,24 @@ def read_Odometers():
     This function is called from main().
 '''
 def handle_rollovers(angDataLt,angDataRt,prevAngDataLt,prevAngDataRt,\
-    prevOdomDistLt,odomDistRt):
+    prevOdomDistLt,prevOdomDistRt):
     # Calculate change in odometer angles
     changeLt = angDataLt - prevAngDataLt  #change in dataLt since last reading
     changeRt = angDataRt - prevAngDataRt  #change in dataRt since last reading
 
     if (angDataLt <341) and (prevAngDataLt >683):  #positive rollover sector
-        odomDistLt = prevOdomDistLt + 1024 + changeLt
+        odomDistLt = prevOdomDistLt + 1024 + changeLt 
     elif (angDataLt >683) and (prevAngDataLt <341):#negative rollover sector
         odomDistLt = prevOdomDistLt - 1024 + changeLt
     else:
         odomDistLt = prevOdomDistLt + changeLt         #no rollover 
 
     if (angDataRt <341) and (prevAngDataRt >683):  #positive rollover
-        odomDistRt = odomDistRt + 1024 + changeRt
+        odomDistRt = prevOdomDistRt + 1024 + changeRt
     elif (angDataRt >683) and (prevAngDataRt <341):#negative rollover
-        odomDistRt = odomDistRt - 1024 + changeRt
+        odomDistRt = prevOdomDistRt - 1024 + changeRt
     else:
-        odomDistRt = odomDistRt + changeRt         #no rollover
+        odomDistRt = prevOdomDistRt + changeRt         #no rollover
     
     prevAngDataLt = angDataLt     #load new dataLt into prevDataLt for next loop
     prevAngDataRt = angDataRt     #load new dataRt into prevDataRt for next loop
@@ -161,8 +161,6 @@ def main():
     # Commands to be actioned once on start of program
     # initialise data links and local variables 
     pygame.init()       #call Function to Initialise Pygame
-    loop1 = True        #boolean variable to allow exit from main loop
-    mode = "Continuous"
     loop1 = True        #boolean variable to allow exit from main loop
     odomDistLt = 0      #start condition for distance travelled by left wheel
     odomDistRt = 0      #start condition for distance travelled by right wheel
