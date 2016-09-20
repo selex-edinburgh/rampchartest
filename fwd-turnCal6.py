@@ -1,9 +1,9 @@
-# desktop/testPrograms/fwd-turnCal6.pi   12/9/16
+# desktop/testPrograms/fwd-turnCal6.pi   20/9/16
 # This program combines MotorTest and OdometerTest to allow calibration of the
 # Wheel/odometer combination in a straight line and in a turn on-the-spot.
 # Arrow keys = start movement forward
 # Space = Stop movement
-# End = Exit program        BUG
+# End = Exit programme
 
 # import libraries
 import sys              # import standard python module
@@ -166,6 +166,7 @@ def handle_rollovers(angDataLt,angDataRt,prevAngDataLt,prevAngDataRt,\
     else:
         odomDistLt = odomDistLt + changeLt         #no rollover 
 
+    # Repeat for the other odometer
     if (angDataRt <341) and (prevAngDataRt >683):  #adjacent rollover sectors
         odomDistRt = odomDistRt + 1024 + changeRt  #positive rollover
     elif (angDataRt >683) and (prevAngDataRt <341):#adjacent rollover sectors
@@ -204,12 +205,14 @@ def latCtrl(legMode,turnMax,turnMin,fwd,turn,wptDist,wptHdg,chassisHdg,decelLat)
         turn = 127 + (hdg2Go * decelLat) #bias turn to maintain desired heading
         
     if legMode == "turnRt":
-        hdg2Go = wptHdg-chassisHdg        
+        friction = 1
+        hdg2Go = wptHdg-(chassisHdg*0.58*friction)       
     # Decel to required Heading without skid at waypoint  
-        if hdg2Go < (turnMax * decelLat):  #Dist from wpt to start deceleration
-            turn = 127 + (hdg2Go/decelLat) + turnMin   #Decelerate to slow speed
-            if turn < 127 + turnMin:
-                turn = 127 + turnMin
+##        if hdg2Go < (turnMax * decelLat):  #Dist from wpt to start deceleration
+##            turn = 127 + (hdg2Go/decelLat) + turnMin   #Decelerate to slow speed
+##            if turn < 127 + turnMin:
+##                turn = 127 + turnMin
+    
 #if legMode == "turnLt":
 #code TBD
                 
@@ -251,21 +254,23 @@ def main():
     wheelTrack = 237    #distance between track of left & right drive wheels mm
 
     legMode = "stop" #default mode
-    wptDist = 2000   #2000 distance required at waypoint - change for testing
+    wptDist = 0   #2000 distance required at waypoint - change for testing
     wptTrack = 0     #0 line dirn from start to waypoint - change for testing 
-    wptHdg = 0       #0 turn heading required at waypoint - change for testing
+    wptHdg = 180       #0 turn heading required at waypoint - change for testing
 
     chassisDist = 0     #total distance from start
     dist2Go = wptDist   #Distance to go to waypoint
-    fwdMax = 60         #max fwd speed (126)
+    fwdMax = 85         #max fwd speed (126)
     fwdMin = 15         #minimum fwd speed to allow instant stop without skid
     decelLong = 0.2     #rate of longitudinal deceleration= 60*decelLong per sec
     
     chassisHdg = 0      #Start Heading of Chassis
     hdg2Go = wptHdg     #Heading  to go to waypoint
-    turnMax = 60        #max turn rate
+    turnMax = 65        #max turn rate
     turnMin = 15        #minimum turn rate to allow instant stop without skid
     decelLat = 1.2      #rate of lateral deceleration
+    #frictionLt = 1     #friction calibration factor for Left drive wheel
+    #frictionRt = 1     #friction calibration factor for Right drive wheel
 
     
 
@@ -286,20 +291,20 @@ def main():
             if event.type == pygame.KEYDOWN:    #detect a key press
                 if event.key == pygame.K_UP:	#Up Arrow= Start Forward
                     legMode = "lineFwd"         #straight line to next wpt
-                    fwd  = 147                  #forward
+                    fwd  = 187                  #forward
                     turn = 127                  #no turn movement
                 if event.key == pygame.K_DOWN:  #Down Arrow= Start Backwards
                     legMode = "lineBack"        #straight line to next wpt
-                    fwd  = 97                   #reverse
+                    fwd  = 47                   #reverse
                     turn = 127                  #no turn movement
                 if event.key == pygame.K_RIGHT: #Right arrow= Start Right turn
                     legMode = "turnRt"          #turn right on spot
                     fwd  = 127                  #no forward movement 
-                    turn = 157                  #turn right
+                    turn = 187                  #turn right
                 if event.key == pygame.K_LEFT:  #Left arrow= Start Left turn
                     legMode = "turnLt"          #turn left on spot
                     fwd  = 127                  #no forward movement 
-                    turn = 97                   #turn left
+                    turn = 67                   #turn left
                 if event.key == pygame.K_SPACE: #STOP MOVEMENT  (Space Bar)
                     fwd  = 127                  #no forward movement
                     turn = 127                  #no turn movement
@@ -316,7 +321,7 @@ def main():
             (fwd,turn,dist2Go) = longCtrl(legMode,fwdMax,fwdMin,fwd,turn,\
             wptDist,wptTrack,chassisDist,decelLong)
             
-            (fwd,turn,Hdg2Go) = latCtrl(legMode,turnMax,turnMin,fwd,turn,\
+            (fwd,turn,hdg2Go) = latCtrl(legMode,turnMax,turnMin,fwd,turn,\
             wptDist,wptHdg,chassisHdg,decelLat)            
 
         if legMode == "turnRt":
@@ -353,36 +358,30 @@ def main():
         (odomDistLt,odomDistRt,prevAngDataLt,prevAngDataRt)= handle_rollovers\
             (angDataLt,angDataRt,prevAngDataLt,prevAngDataRt,\
              odomDistLt,odomDistRt)
+
         # correct for right odometer and motor operating in reverse
-#        correctedOdomDistLt1 = odomDistLt 
         odomDistRtReversed = -odomDistRt    #value for display
-        # correct for both odometers initial position at start
+        
+        # correct for both odometers initial position at start (Done already)
 #        correctedOdomDistLt2 = correctedOdomDistLt1 - odomAngOffsetLt
 #        correctedOdomDistRt2 = correctedOdomDistRt1 + odomAngOffsetRt
 
-        # Calculate distance moved by each wheel in mm 
-        # wheelDist = (wheelDia * pi) * odomDist / 1024
-        wheelDistLt = wheelDiaLt * math.pi * odomDistLt /1024
-        wheelDistRt = wheelDiaRt * math.pi * -odomDistRt /1024
-        wheelDistLt = round(wheelDistLt,1)  #round number to one decimal place
-        wheelDistRt = round(wheelDistRt,1)  #round number to one decimal place
-        chassisDist = (wheelDistLt + wheelDistRt) /2 #total distance from start
+        # Convert odometer angle(bits) into distance moved by wheel in mm 
+        # wheelDist = (wheelDia * pi) * odomDist / 1024     
+        wheelDistLt = wheelDiaLt * math.pi * odomDistLt/1024  #Convert to deg
+        wheelDistRt = wheelDiaRt * math.pi * -odomDistRt/1024 #..from radians
+        wheelDistLt = round(wheelDistLt,1) #round number to one decimal place
+        wheelDistRt = round(wheelDistRt,1) #round number to one decimal place
+        chassisDist = (wheelDistLt+ wheelDistRt)/2 #total distance from start
         
-        #Calculate Heading 
-#        WHEELCIRCUMFERENCE = 500
-#        TRACKWIDTH = 237    
-#        heading = (360*(((odomDistLt-odomDistRtReversed)/2)*\
-#                       ((WHEELCIRCUMFERENCE)/(1024*math.pi*TRACKWIDTH))))%360
-#        headingRounded = round(heading, 1) # rounded for ease of use
-
-        # Calculate Heading in degrees with respect to North (y axis)
+        # Calc Heading in degrees with respect to North (y axis)...
         # using difference in distance travelled by each wheel
         differenceInDist = (wheelDistLt - wheelDistRt)
         # chassis heading in Radians = difference in distance / wheeltrack
-        chassisHdg = math.degrees(differenceInDist/wheelTrack) #change to deg      
+        chassisHdg = math.degrees(differenceInDist/(wheelTrack)) #change to deg      
 
 #        dist2Go = wptDist-chassisDist
-        hdg2Go = wptHdg-chassisHdg
+#        hdg2Go = wptHdg-chassisHdg
 
         
         # Pygame Display Code
