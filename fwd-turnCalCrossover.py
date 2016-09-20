@@ -142,6 +142,13 @@ def read_Odometers():
     GPIO.output(24, True)   #Chip Select pin High (back to normal state)
     return (angDataLt, angDataRt, statusLt, statusRt)   #return values to main()
 
+'''
+    The read_correct_odo function corrects 
+'''
+def read_correct_odo():
+    (angDataLt,angDataRt, statusLt,statusRt) = read_Odometers()
+    return (angDataLt,1024-angDataRt, statusLt,statusRt)
+
 '''    
     The handle_rollovers function will detect any rollovers that may
     occur during runtime and thereby achieve a continuous distance count
@@ -269,9 +276,9 @@ def main():
     decelLat = 1.2      #rate of lateral deceleration
 
     
-
+    
     # Read odometers once to get wheel angle offsets at robot start position
-    (angDataLt,angDataRt, statusLt,statusRt) = read_Odometers() #function call
+    (angDataLt,angDataRt, statusLt,statusRt) = read_correct_odo() #function call
                                                 #to obtain raw data and status
     prevAngDataLt = angDataLt   #start condition for prevAngDataLt
     prevAngDataRt = angDataRt   #start condition for prevAngDataRt
@@ -355,7 +362,7 @@ def main():
 
         # Odometer Code
         # read odometers for raw angle data and status
-        (angDataLt,angDataRt,statusLt,statusRt) = read_Odometers()
+        (angDataLt,angDataRt,statusLt,statusRt) = read_correct_odo()
 
         # calculate odometer distances by actioning rollovers
         (odomDistLt,odomDistRt,prevAngDataLt,prevAngDataRt)= handle_rollovers\
@@ -363,7 +370,7 @@ def main():
              odomDistLt,odomDistRt)
         # correct for right odometer and motor operating in reverse
 #        correctedOdomDistLt1 = odomDistLt 
-        odomDistRtReversed = -odomDistRt    #value for display
+        odomDistRtReversed = odomDistRt    #value for display
         # correct for both odometers initial position at start
 #        correctedOdomDistLt2 = correctedOdomDistLt1 - odomAngOffsetLt
 #        correctedOdomDistRt2 = correctedOdomDistRt1 + odomAngOffsetRt
