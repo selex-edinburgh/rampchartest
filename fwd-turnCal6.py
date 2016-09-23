@@ -205,7 +205,7 @@ def latCtrl(legMode,turnMax,turnMin,fwd,turn,wptDist,wptHdg,chassisHdg,decelLat)
         turn = 127 + (hdg2Go * decelLat) #bias turn to maintain desired heading
         
     if legMode == "turnRt":
-        friction = 1
+        friction = 1.03
         hdg2Go = wptHdg-(chassisHdg*0.58*friction)       
     # Decel to required Heading without skid at waypoint  
 ##        if hdg2Go < (turnMax * decelLat):  #Dist from wpt to start deceleration
@@ -253,10 +253,10 @@ def main():
     wheelDiaRt = 150    #diameter of right drive wheel mm
     wheelTrack = 237    #distance between track of left & right drive wheels mm
 
-    legMode = "stop" #default mode
-    wptDist = 0   #2000 distance required at waypoint - change for testing
-    wptTrack = 0     #0 line dirn from start to waypoint - change for testing 
-    wptHdg = 180       #0 turn heading required at waypoint - change for testing
+    legMode = "stop"    #default mode
+    wptDist = 0         #2000 distance required at waypoint - change for testing
+    wptTrack = 0        #0 line dirn from start to waypoint - change for testing 
+    wptHdg = 90         #0 turn heading required at waypoint - change for testing
 
     chassisDist = 0     #total distance from start
     dist2Go = wptDist   #Distance to go to waypoint

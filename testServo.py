@@ -81,7 +81,7 @@ def main():
 #        control= 45-47 Stepper Scan Between 2 Angles (32+12+Speed 1-3)
 #        control= 73-75 Servo Go To Fixed Angle (64+8+Speed 1-3)
 #        control= 77-79 Servo Scan Between 2 Angles (64+12+Speed 1-3)
-        control = 79 #Change these numbers
+        control = 47 #Change these numbers
         steprFixedAngle = 60     #degrees (0.1 deg accuracy available)
         steprScanAngleLt = 60   #degrees (to 1 deg accuracy)
         steprScanAngleRt = -45  #degrees (to 1 deg accuracy)
