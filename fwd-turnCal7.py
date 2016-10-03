@@ -1,9 +1,10 @@
-# desktop/testPrograms/fwd-turnCal6.pi   20/9/16
+# desktop/testPrograms/fwd-turnCal7.pi   3/10/16
 # This program combines MotorTest and OdometerTest to allow calibration of the
 # Wheel/odometer combination in a straight line and in a turn on-the-spot.
 # Arrow keys = start movement forward
 # Space = Stop movement
 # End = Exit programme
+# new algorithms for long and lat turn
 
 # import libraries
 import sys              # import standard python module
@@ -181,44 +182,78 @@ def handle_rollovers(angDataLt,angDataRt,prevAngDataLt,prevAngDataRt,\
 
 '''
     The longCtrl() function handles the longitudinal chassis movement algorithms
+    The speed profile is Accelerate, Cruise, Decelerate, Creep and Stop at
+    the next waypoint without skidding. 
 '''
-def longCtrl(legMode,fwdMax,fwdMin,fwd,turn,wptDist,wptHdg,\
-        chassisDist,decelLong):
+def longCtrl(legMode,fwdSpd,fwdMin,wptDist,legDistLt,legDistRt,decelLong):
     if legMode == "lineFwd":
-    # Decel to stop without skid at waypoint 
+    #Accelerate, Cruise, Decelerate, Creep and Stop at waypoint without skidding    
+        chassisDist = (legDistLt + legDistRt)/2 #total distance from start of leg
         dist2Go = wptDist-chassisDist   #distance to go to waypoint
-        decelDist = (fwd - 127)*10      #dist from wpt to start deceleration
-        if dist2Go < decelDist:         #start deceleration
-            fwd = int(fwd - decelLong)  #rate of deceleration
-            if fwd < 127 + fwdMin:      #speed to allow a stop without skid
-                fwd = 127 + fwdMin   
+        decelSpd = dist2Go * decelLong  #reduce speed as distance to go reduces
+        fwd = decelSpd                  #decelSpd when following if statements false
+        if decelSpd >= fwdSpd:          #acceleration and cruise phases
+            fwd = fwdSpd                #normal cruise speed
+        if decelSpd <= fwdSpd:          #creep phase
+            fwd = fwdMin                #creep forward to waypoint
         if dist2Go <= 0:                #reached waypoint
-            fwd = 127                   #stop
-    return(int(fwd),int(turn),dist2Go)
+            fwd = 0                     #stop
+        fwd = 127+ fwd                  #correct for zero datum
+    return(int(fwd),dist2Go)
 
 '''
     The latCtrl() function handles the lateral chassis movement algorithms
+    The turn rate profile is Accelerate, Cruise, Decelerate, Creep and Stop
+    turn at the next waypoint without skidding.
+    The chassis heading in degrees with respect to North (y axis)is calculated
+    using the difference in distance travelled by each wheel:
+      chassis heading in Radians = difference in distance / wheeltrack
+      chassis Hdg in degrees = difference in distance *0.24 deg   [180/pi/237]
+    Due to the offset position of the two drive wheels and odometers the wheels
+    skid laterally during a turn-on-the-spot and an additional correction
+    factor of 0.58 is required. Finally a small correction for friction is
+    used to calibrate the turn.
+    The maths is covered in Appendix x
 '''
-def latCtrl(legMode,turnMax,turnMin,fwd,turn,wptDist,wptHdg,chassisHdg,decelLat):
+def latCtrl(legMode,turnSpd,turnMin,wptHdg,chassisHdg,legDistLt,legDistRt,decelLat):
     if legMode == "lineFwd":
-        hdg2Go = wptHdg-chassisHdg       #heading error
-        turn = 127 + (hdg2Go * decelLat) #bias turn to maintain desired heading
+    #regain heading during straight line
+        #calculate total heading change from start of leg and convert from -
+        #   radians to deg = difference in distance *0.24 deg   [180/pi/237]
+        legChassis = (legDistLt-legDistRt)*0.24  #wheel offset factor N/A
+        hdg2Go = wptHdg - chassisHdg    #heading error
+        turn = hdg2Go * decelLat        #required turn rate to regain track angle
+        turn = 127 + turn               #correct for zero datum
         
     if legMode == "turnRt":
-        friction = 1.03
-        hdg2Go = wptHdg-(chassisHdg*0.58*friction)       
-    # Decel to required Heading without skid at waypoint  
-##        if hdg2Go < (turnMax * decelLat):  #Dist from wpt to start deceleration
-##            turn = 127 + (hdg2Go/decelLat) + turnMin   #Decelerate to slow speed
-##            if turn < 127 + turnMin:
-##                turn = 127 + turnMin
-    
-#if legMode == "turnLt":
-#code TBD
-                
-        if hdg2Go <= 0:     #reached waypoint
-            turn = 127      #Stop
-    return(int(fwd),int(turn),hdg2Go)
+        friction = 1.00                 #wheel lateral skid friction (was 1.03)
+        #calculate total heading change from start of leg -
+        #   using difference in distance travelled by each wheel
+        # chassis heading in radians = difference in distance / wheeltrack
+        # chassis Hdg in degrees = difference in distance *0.24 deg [180/pi/237]
+        chassisHdg = (wheelDistLt - wheelDistRt) *0.24
+   #     chassisHdg = math.degrees(differenceInDist/(wheelTrack)) #change to deg      
+        chassisHdg= chassisHdg *0.58 *friction #correct for offset wheel position   
+#~~~        #Calc Heading in degrees with respect to North (y axis)...
+
+        #turn to new waypoint heading and stop without skidding
+        hdg2Go = wptHdg - chassisHdg    #hdg2Go to reach waypoint heading
+    #Accelerate, Cruise, Decelerate, Creep and Stop at waypoint without skidding    
+        decelTurn = hdg2Go * decelLat   #required turn rate during deceleration phase
+        turn = decelTurn                #decelTurn when following if statements false
+        if decelTurn >= turnSpd:        #acceleration and cruise turn phases
+            turn = turnSpd              #normal turn speed
+        if decelTurn <= turnMin:        #creep phase
+            turn = turnMin              #creep round to required heading
+        if hdg2Go <= 0:                 #reached required heading
+            turn = 0                    #stop turn
+        turn = 127 + turn               #correct for zero datum
+        
+    #if legMode == "turnLt":
+    #code TBD
+
+#    return(int(turn),hdg2Go)
+    return(turn,hdg2Go)
         
 '''
     This is the main function of the program. 
@@ -245,31 +280,34 @@ def main():
     loop1 = True        #boolean variable to allow exit from main loop
     fwd = 127		#motor command no forward movement
     turn = 127		#motor command no Turn Rate
+    fwdMax = 100        #max fwd speed 
+    turnMax = 100       #max turn rate 
     odomDistLt = 0      #start condition for distance travelled by left wheel
     odomDistRt = 0      #start condition for distance travelled by right wheel
     prevAngDataLt= 0    #start condition for Lt odom angle data on previous read
     prevAngDataRt= 0    #start condition for Rt odom angle data on previous read
-#    status = "stopped"  #programme status
     legMode = "stop"    #default mode
     chassisDist = 0     #total distance from start
-    chassisHdg = 0      #Start Heading of Chassis
+    chassisHdg = 0      #start heading of chassis
+    hdg2Go = 0          #heading  to go to waypoint   
 
     #Longitudinal and Lateral parameters that control the test manoeuvres.
-#    lateralCorrect "off" #turn off lateral correction for test 1
+    WPnum = 2           #next waypoint number
+    previousWPnum = 1       #previous waypoint number
+    lateralCorrect= True  #turn on/off lateral correction for test 1 (lineFwd)
     wptDist = 2000      #2000 distance required at waypoint - change for testing
-    wptTrack = 0        #0 line dirn from start to waypoint - change for testing 
-    wptHdg = 0          #0 turn heading required at waypoint- change for testing
-    fwdMax = 100         #max fwd speed 
-    turnMax = 100        #max turn rate 
+    wptHdg = 0          #heading required at waypoint - change for testing 
+    fwdSpd = 30         #standard forward speed (normal range 30 to 60)
+    turnSpd = 30         #standard turn-rate (normal range 40 to 70)
 
-    dist2Go = wptDist   #Distance to go to waypoint
-    hdg2Go = wptHdg     #Heading  to go to waypoint   
+    #specific values for this programme
+    dist2Go = wptDist   #Distance to go to waypoint  
 
     #Chassis parameters
     wheelDiaLt = 150    #diameter of left drive wheel mm
     wheelDiaRt = 150    #diameter of right drive wheel mm
     wheelTrack = 237    #distance between track of left & right drive wheels mm
-#    motorBias = 0       #difference in power between the left and right motors
+    motorBias = 4       #difference in power between the left and right motors
 
     #Longitudinal Calibration parameters
     fwdMin = 15         #minimum fwd speed to allow instant stop without skid
@@ -281,8 +319,6 @@ def main():
     #frictionLt = 1     #friction calibration factor for Left drive wheel
     #frictionRt = 1     #friction calibration factor for Right drive wheel
 
-    
-
     # Read odometers once to get wheel angle offsets at robot start position
     (angDataLt,angDataRt, statusLt,statusRt) = read_Odometers() #function call
                                                 #to obtain raw data and status
@@ -290,82 +326,14 @@ def main():
     prevAngDataRt = angDataRt   #start condition for prevAngDataRt
 
     '''
-    Commands to be actioned endlessly in a loop until program is stopped    
+    Commands to be actioned endlessly in a loop until program is stopped
+    1.  Read Odometers
+    2.  Calculate Logitudinal and Lateral control corrections
+    3.  Action Key presses
+    4.  Send Output to Motors
+    5.  Display Parameters Code
     '''
-    while loop1 == True:    #loops until loop1 is declared False
-
-        # Motor Code
-        for event in pygame.event.get():
-            # if a designated keyboard key is pressed do following actions:
-            if event.type == pygame.KEYDOWN:    #detect a key press
-                if event.key == pygame.K_UP:	#Up Arrow= Start Forward
-                    legMode = "lineFwd"         #straight line to next wpt
-                    fwd  = 187                  #forward (+60 is a good speed)
-                    turn = 127                  #no turn movement
-                if event.key == pygame.K_DOWN:  #Down Arrow= Start Backwards
-                    legMode = "lineBack"        #straight line to next wpt
-                    fwd  = 67                   #reverse (-60 is a good speed)
-                    turn = 127                  #no turn movement
-                if event.key == pygame.K_RIGHT: #Right arrow= Start Right turn
-                    legMode = "turnRt"          #turn right on spot
-                    fwd  = 127                  #no forward movement 
-                    turn = 187                  #turn right (+60 is a good speed)
-                if event.key == pygame.K_LEFT:  #Left arrow= Start Left turn
-                    legMode = "turnLt"          #turn left on spot
-                    fwd  = 127                  #no forward movement 
-                    turn = 67                   #turn left (-60 is a good speed)
-                if event.key == pygame.K_SPACE: #STOP MOVEMENT  (Space Bar)
-                    fwd  = 127                  #no forward movement
-                    turn = 127                  #no turn movement
-                if event.key == pygame.K_END:   #END PROGRAM  (End Key)
-                    fwd  = 127                  #no forward movement   
-                    turn = 127                  #no turn movement
-                    status = "end"              #Setting screen output to "end"
-                    for n in range(3):          #Send stop command 3 times
-                        ser.write(chr(fwd))     #send fwd command to motor
-                        ser.write(chr(turn))    #send turn command to motor
-                        time.sleep(0.016)       #Wait for 16 msec
-                    loop1 = False               #Set loop1 to False to exit current loop
-#                    fwd  = 127                  #no forward movement   
-#                    turn = 127                  #no turn movement
-#                    ser.write(chr(fwd))         #send fwd command to motor
-#                    ser.write(chr(turn))        #send turn command to motor
-#                    time.sleep(0.02)            #allow time for serial comms
-#                    loop1 = False               #Exit loop1 and close programme
-
-        # Call the longitudinal and lateral control functions to test movement
-        if legMode == "lineFwd":
-            (fwd,turn,dist2Go) = longCtrl(legMode,fwdMax,fwdMin,fwd,turn,\
-            wptDist,wptTrack,chassisDist,decelLong)
-            
-            (fwd,turn,hdg2Go) = latCtrl(legMode,turnMax,turnMin,fwd,turn,\
-            wptDist,wptHdg,chassisHdg,decelLat)            
-
-        if legMode == "turnRt":
-            (fwd,turn,hdg2Go) = latCtrl(legMode,turnMax,turnMin,fwd,turn,\
-                wptDist,wptHdg,chassisHdg,decelLat)            
-
-        # limit values & write the fwd and turn to the motors via serial link
-        if fwdMax > 126:
-            fwdMax = 126    #valid number wrt 127 to fit within a single byte
-            
-        if (fwd < 127 + fwdMax) and (fwd > 127 - fwdMax):   #valid range 
-            ser.write(chr(fwd))         #send fwd command to motor board
-        else:
-            fwd = 127                   #no forward movement
-            ser.write(chr(fwd))         #send fwd command to motor board
-
-        if turnMax > 126:
-            fwdMax = 126    #valid number wrt 127 to fit within a single byte
-
-        if (turn < 127 + turnMax) and (turn > 127 - turnMax): #valid range
-            ser.write(chr(turn))        #send turn command to motor board
-        else:
-            turn = 127                  #no turn movement
-            ser.write(chr(turn))        #send turn command to motor board
-
-#       telemetry = getTelemetry(ser)  #Receive Telemetry from chariot serial
-
+    while loop1 == True:    #loop until loop1 is declared False
 
         # Odometer Code
         # read odometers for raw angle data and status
@@ -379,66 +347,145 @@ def main():
         # correct for right odometer and motor operating in reverse
         odomDistRtReversed = -odomDistRt    #value for display
         
-        # correct for both odometers initial position at start (Done already)
-#        correctedOdomDistLt2 = correctedOdomDistLt1 - odomAngOffsetLt
-#        correctedOdomDistRt2 = correctedOdomDistRt1 + odomAngOffsetRt
-
         # Convert odometer angle(bits) into distance moved by wheel in mm 
         # wheelDist = (wheelDia * pi) * odomDist / 1024     
         wheelDistLt = wheelDiaLt * math.pi * odomDistLt/1024  #Convert to deg
-        wheelDistRt = wheelDiaRt * math.pi * -odomDistRt/1024 #..from radians
+        wheelDistRt = wheelDiaRt * math.pi * -odomDistRt/1024 #  from radians
         wheelDistLt = round(wheelDistLt,1) #round number to one decimal place
         wheelDistRt = round(wheelDistRt,1) #round number to one decimal place
-        chassisDist = (wheelDistLt+ wheelDistRt)/2 #total distance from start
-        
+
+        # save wheel distances at start of each leg (Waypoiont)
+        if WPnum > previousWPnum:           #waypoint has changed
+            startDistLt = wheelDistLt       #store Left wheel distance
+            startDistRt = wheelDistRt       #store Right wheel distance
+            legDistLt = wheelDistLt-startDistLt     #Calc leg Distance Left
+            legDistRt = wheelDistRt-startDistRt     #Calc leg Distance Right
+            previousWPnum = WPnum       #change prevWPnum after storing dist
+
+
+#REMOVE      
         # Calc Heading in degrees with respect to North (y axis)...
         # using difference in distance travelled by each wheel
-        differenceInDist = (wheelDistLt - wheelDistRt)
+#        differenceInDist = (wheelDistLt - wheelDistRt)
         # chassis heading in Radians = difference in distance / wheeltrack
-        chassisHdg = math.degrees(differenceInDist/(wheelTrack)) #change to deg      
+        # chassis Hdg in degrees = difference in distance *0.24 deg [180/pi/237]
+#        chassisHdg = math.degrees(differenceInDist/(wheelTrack)) #change to deg      
 
-#        dist2Go = wptDist-chassisDist
-#        hdg2Go = wptHdg-chassisHdg
 
-        
-        # Pygame Display Code
+        # Logitudinal and Lateral Control Code
+        # Call the longitudinal and lateral control functions to test movement
+        if legMode == "lineFwd":
+            (fwd,dist2Go) = longCtrl(legMode,fwdSpd,fwdMin,\
+                wptDist,legDistLt,legDistRt,decelLong)
+
+            if lateralCorrect == True:  #correct Hdg to maintain straight track        
+                (turn,hdg2Go) = latCtrl(legMode,turnSpd,turnMin,\
+                    wptHdg,chassisHdg,legDistLt,legDistRt,decelLat)            
+
+        if legMode == "turnRt":
+            (turn,hdg2Go) = latCtrl(legMode,turnSpd,turnMin,\
+                wptHdg,chassisHdg,legDistLt,legDistRt,decelLat)            
+
+        #Key Press Code
+        for event in pygame.event.get():
+            # if a designated keyboard key is pressed do following actions:
+            if event.type == pygame.KEYDOWN:    #detect a key press
+                if event.key == pygame.K_UP:	#Up Arrow= Start Forward
+                    legMode = "lineFwd"         #straight line to next wpt
+                    fwd  = 127 +fwdSpd          #forward speed
+                    turn = 127                  #no turn movement
+                if event.key == pygame.K_DOWN:  #Down Arrow= Start Backwards
+                    legMode = "lineBack"        #straight line to next wpt
+                    fwd  = 127 - fwdSpd         #reverse speed
+                    turn = 127                  #no turn movement
+                if event.key == pygame.K_RIGHT: #Right arrow= Start Right turn
+                    legMode = "turnRt"          #turn right on spot
+                    fwd  = 127                  #no forward movement 
+                    turn = 127 + turnSpd        #turn right 
+                if event.key == pygame.K_LEFT:  #Left arrow= Start Left turn
+                    legMode = "turnLt"          #turn left on spot
+                    fwd  = 127                  #no forward movement 
+                    turn = 127 - turnSpd        #turn left 
+                if event.key == pygame.K_SPACE: #STOP MOVEMENT  (Space Bar)
+                    legMode = "stop"          #turn left on spot
+                    fwd  = 127                  #no forward movement
+                    turn = 127                  #no turn movement
+                if event.key == pygame.K_END:   #END PROGRAM  (End Key)
+                    fwd  = 127                  #no forward movement   
+                    turn = 127                  #no turn movement
+                    status = "end"              #Setting screen output to "end"
+                    for n in range(5):          #Send stop command 5 times
+                        ser.write(chr(fwd))     #send fwd command to motor
+                        ser.write(chr(turn))    #send turn command to motor
+                        time.sleep(0.016)       #Wait for 16 msec
+                    loop1 = False               #Set loop1 to False to exit current loop
+
+
+        # Output to Motors Code
+        # limit values & write the fwd and turn to the motors via serial link
+        if fwdMax > 126:
+            fwdMax = 126    #valid number wrt 127 to fit within a single byte
+            
+        if (fwd < 127 + fwdMax) and (fwd > 127 - fwdMax):   #valid range
+            fwd = int(fwd)              #change float to integer type
+            ser.write(chr(fwd))         #send fwd command to motor board
+        else:
+            fwd = 127                   #no forward movement
+            ser.write(chr(fwd))         #send fwd command to motor board
+
+        if turnMax > 126:
+            turnMax = 126    #valid number wrt 127 to fit within a single byte
+
+        if (turn < 127 + turnMax) and (turn > 127 - turnMax): #valid range
+            turn = int(turn) #add motorBias & change float to integer type
+            ser.write(chr(turn+motorBias))  #send turn command to motor board
+        else:
+            turn = 127                  #no turn movement
+            ser.write(chr(turn))        #send turn command to motor board
+
+#       telemetry = getTelemetry(ser)  #Receive Telemetry from chariot serial
+
+
+        # Display Parameters Code
         # update the pygame data display
         screen.fill(black)  #Blank out previous digits in display window
 
         # Display motor output text and values to the screen
-        screen.blit(font.render("Fwd Speed   Turn Rate",True,white),(100,5))
+        screen.blit(font.render("Fwd Speed   Turn Rate  Motor Bias",\
+            True,white),(100,5))
         screen.blit(font.render(str(fwd),True,white),(125,20))
         screen.blit(font.render(str(turn),True,white),(188,20))
+        screen.blit(font.render(str(motorBias),True,white),(255,20))
 
         # Display odometer output text and values to the screen
         screen.blit(font.render("Left Odom   Right Odom    Heading",\
             True,white),(100,40))
-        screen.blit(font.render("Rollover",True,white),(15,55))
-        screen.blit(font.render("Continuous",True,white),(15,70))
-        screen.blit(font.render("Rt Reversed",True,white),(15,85))
-        screen.blit(font.render("Wheel Dist",True,white),(15,100))        
-        screen.blit(font.render("ChassisDist",True,white),(15,115))        
-        screen.blit(font.render("Dist2Go/Hdg2Go",True,white),(15,130))        
+#        screen.blit(font.render("Rollover",True,white),(15,55))
+#        screen.blit(font.render("Continuous",True,white),(15,70))
+#        screen.blit(font.render("Rt Reversed",True,white),(15,85))
+        screen.blit(font.render("Odom Dist",True,white),(15,55))
+        screen.blit(font.render("Wheel Dist mm",True,white),(15,70))        
+        screen.blit(font.render("ChassisDist & Hdg",True,white),(15,85))        
+        screen.blit(font.render("Dist2Go & Hdg2Go",True,white),(15,100))        
 
         # Display odometer test values to test for correct odom readings
-        screen.blit(font.render(str(angDataLt),True,white),(123,55))
-        screen.blit(font.render(str(angDataRt),True,white),(193,55))
-        screen.blit(font.render(str(odomDistLt),True,white),(123,70))
-        screen.blit(font.render(str(odomDistRt),True,white),(193,70))
-        screen.blit(font.render(str(odomDistLt),True,white),(123,85))
-        screen.blit(font.render(str(odomDistRtReversed),True,white),(193,85))
+#        screen.blit(font.render(str(angDataLt),True,white),(123,55))
+#        screen.blit(font.render(str(angDataRt),True,white),(193,55))
+#        screen.blit(font.render(str(odomDistLt),True,white),(123,70))
+#        screen.blit(font.render(str(odomDistRt),True,white),(193,70))
+        screen.blit(font.render(str(odomDistLt),True,white),(123,55))
+        screen.blit(font.render(str(odomDistRtReversed),True,white),(193,55))
 
         # Scalings applied to give correct wheel distances and heading        
-        screen.blit(font.render(str(int(wheelDistLt)),True,white),(123,100))
-        screen.blit(font.render(str(int(wheelDistRt)),True,white),(193,100))
-#        screen.blit(font.render(str(headingRounded),True,white),(255,90))
-        screen.blit(font.render(str(round(chassisHdg,1)),\
-            True,white),(255,100))
+        screen.blit(font.render(str(int(wheelDistLt)),True,white),(123,70))
+        screen.blit(font.render(str(int(wheelDistRt)),True,white),(193,70))
 
 #        screen.blit(font.render(str(int(wptDist)),True,white),(123,115))
-        screen.blit(font.render(str(int(chassisDist)),True,white),(158,115))
-        screen.blit(font.render(str(int(dist2Go)),True,white),(158,130))
-        screen.blit(font.render(str(int(hdg2Go)),True,white),(255,130))
+        screen.blit(font.render(str(int(chassisDist)),True,white),(158,85))
+        screen.blit(font.render(str(round(chassisHdg,1)),\
+            True,white),(255,85))
+        screen.blit(font.render(str(int(dist2Go)),True,white),(158,100))
+        screen.blit(font.render(str(int(hdg2Go)),True,white),(255,100))
         
         #Display telemetry values  -Not Used
 #        screen.blit(font.render(str(telemetry[0]),True,white),(50,25))

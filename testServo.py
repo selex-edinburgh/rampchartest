@@ -20,7 +20,7 @@ white = (255,255,255)
 red = (255,0,0)
 # Set display parameters of the window
 displayWidth = 190
-displayHeight = 50
+displayHeight = 100
 screen = pygame.display.set_mode((displayWidth,displayHeight)) 
 font = pygame.font.SysFont('Avenir Next', 20)	# Preset font to use
 pygame.display.set_caption("Servo Test")
@@ -30,11 +30,13 @@ def screen_display(angle, distance, caption):
         if caption== "U-S":
                 screen.blit(font.render("U-S Angle: ",True,white),(15,5))
                 screen.blit(font.render("U-S Range: ",True,white),(15,25))
+                screen.blit(font.render(str(angle),True,white),(125,5))
+                screen.blit(font.render(str(distance),True,white),(125,25))
         if caption== "I-R":
-                screen.blit(font.render("I-R Angle: ",True,white),(15,5))
-                screen.blit(font.render("I-R Range: ",True,white),(15,25))
-        screen.blit(font.render(str(angle),True,white),(125,5))
-        screen.blit(font.render(str(distance),True,white),(125,25))
+                screen.blit(font.render("I-R Angle: ",True,white),(15,45))
+                screen.blit(font.render("I-R Range: ",True,white),(15,65))
+                screen.blit(font.render(str(angle),True,white),(125,45))
+                screen.blit(font.render(str(distance),True,white),(125,65))
         pygame.display.update()		# update the display on each loop
 
 
@@ -81,12 +83,12 @@ def main():
 #        control= 45-47 Stepper Scan Between 2 Angles (32+12+Speed 1-3)
 #        control= 73-75 Servo Go To Fixed Angle (64+8+Speed 1-3)
 #        control= 77-79 Servo Scan Between 2 Angles (64+12+Speed 1-3)
-        control = 47 #Change these numbers
-        steprFixedAngle = 60     #degrees (0.1 deg accuracy available)
-        steprScanAngleLt = 60   #degrees (to 1 deg accuracy)
+        control = 74 #change these numbers
+        steprFixedAngle = 0     #degrees (0.1 deg accuracy available)
+        steprScanAngleLt = 45   #degrees (to 1 deg accuracy)
         steprScanAngleRt = -45  #degrees (to 1 deg accuracy)
-        servoFixedAngle = 30     #degrees (0.1 deg accuracy available)
-        servoScanAngleLt = 10   #degrees (to 1 deg accuracy)
+        servoFixedAngle = 0     #degrees (0.1 deg accuracy available)
+        servoScanAngleLt =  45  #degrees (to 1 deg accuracy)
         servoScanAngleRt = -45  #degrees (to 1 deg accuracy)
         
 # Calibration values        
@@ -154,16 +156,24 @@ def main():
         time.sleep(0.015)            #Must Wait at least 15msec 
 #        time.sleep(0.005)           #Wait 5 msecs
 #        minRange = 300              #That's IR?????
-        
+
+        while True:        
 # Choose Control Code to READ Data from Stepper Motor and I-R Sensor
 #        control= 112 Send Back Current I-R Range & Stepper Angle (96+16)
 #        control= 116 Send Back Nearest I-R Range & Stepper Angle (96+20)
 #        control= 144 Send Back Current U-S Range & Servo Angle (128+16)
 #        control= 148 Send Back Nearest U-S Range & Servo Angle (128+20)
-        control = 148  #Change this number
+                control = 148  #Change this number
+#                if control == 148:                              #NEW CODE
+#                        control = 116
+#
+#                if control == 116:                              #NEW CODE
+#                        control = 148
+
+
 
 # Loop to READ the Motor (angle) and Sensor Range (distance)
-        while True:
+#        while True:
                 detect_close()  #Sub Routine to detect Key presses to close programme
                 rxBytes = read_I2C(address,control,numBytes)  #Read 4 Bytes                
                 angle = rxBytes[0]*256 + rxBytes[1]     #Add High and Low Bytes
@@ -212,9 +222,9 @@ def main():
 #                               print"Min range", minRange
 #                       if angle > 42.5 or angle < -42:
 #                               minRange = 300
+                        
 
-
-                time.sleep(0.005)                 #Wait at least 0.002
+                time.sleep(0.008)                 #Wait at least 0.002
 #                time.sleep(0.010)		 # sleep for 10ms
 main()
 

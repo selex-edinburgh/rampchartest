@@ -109,9 +109,9 @@ def main():
     turnMax = 126       #max turn rate (126 or less)
     status = "running"  #Program status
     ending = True
-    '''
-    Commands to be actioned endlessly in a loop until program is stopped    
-    '''
+    
+    # Commands to be actioned endlessly in a loop until program is stopped    
+    
     while loop1 == True:    #loops until loop1 is declared False
 
         # Motor Code
@@ -142,7 +142,7 @@ def main():
                     fwd  = 127                      #no forward movement   
                     turn = 127                      #no turn movement
                     status = "stop"                 #enters endless safe loop
-                        
+                    
         # limit values & write the fwd and turn to the motors via serial link
         if fwdMax > 126:
             fwdMax = 126    #valid number wrt 127 to fit within a single byte
