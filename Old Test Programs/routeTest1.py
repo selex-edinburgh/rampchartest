@@ -1,9 +1,10 @@
-#desktop/testPrograms/routeTest1.pi   9/9/16
-#This program extends fwd-turnCal.pi to undertake a square route Left & right
-#s = start movement forward
-#r = start movement reverse
-#c = change direction of square (default = Clockwise)
-#space = stop movement
+# desktop/testPrograms/routeTest1.pi   9/9/16
+# This program extends fwd-turnCal.pi to undertake a square route Left & right
+# s = start movement forward
+# r = start movement reverse
+# c = change direction of square (default = Clockwise)
+# Space = Stop movement
+# End = Exit programme
 
 import sys
 import time
